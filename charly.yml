@@ -1,7 +1,7 @@
 version: 2026.240.1943
 punktfunk-client:
     candy:
-        version: 2026.242.1200
+        version: 2026.242.1635
         description: |
             The punktfunk streaming **client**: the `punktfunk-client` package and the
             headless `punktfunk` CLI it ships, installed from unom's signed pacman repo on
@@ -26,12 +26,27 @@ punktfunk-client:
             already proven by the host beds, so anything that breaks here is the package,
             not the repo plumbing.
 
-            ## No compositor, deliberately
+            ## `punktfunk` is the control CLI; `punktfunk-client` is the renderer
 
-            The GUI client would drag a second Wayland stack into every client venue and
-            prove less than the headless CLI does. The `punktfunk` CLI is what a fleet bed
-            drives — `pair`, `speed-test`, `launch` — and it needs no display server, so a
-            client venue stays a plain container.
+            The package ships three binaries, and they are not interchangeable:
+
+            | Binary | Links | Role |
+            |---|---|---|
+            | `punktfunk` | libgcc, libm, libc — *nothing else* | control CLI |
+            | `punktfunk-client` | 137 objects: libvulkan, libwayland-\*, libdrm, libgbm | the decoder |
+            | `punktfunk-session` | — | session host |
+
+            Everything that only talks to a host — `pair`, `hosts list`, `library`,
+            `reachable`, `wake` — runs on the control binary and needs no display. But
+            `launch` and `open` **spawn the renderer**, which is a Wayland client and needs
+            both a compositor in the venue and a hardware Vulkan ICD. A venue that only ever
+            pairs can stay a plain container; a venue that must pull a stream cannot.
+
+            This is worth stating explicitly because the failure is silent in a misleading
+            way: with no decoder reachable the client advertises codec `0x00`, the host
+            answers `no shared video codec: client advertised 0x00, host can emit 0x01`, and
+            the message reads like a host or driver defect. It is neither — it is the client
+            accurately reporting that it has nothing to decode with.
 
             ## The CLI is the point
 
@@ -54,6 +69,20 @@ punktfunk-client:
             arch:
                 package:
                     - punktfunk-client
+                    # The RENDERER needs a hardware Vulkan ICD. `punktfunk-client` pulls
+                    # none, and a base that ships only `vulkan-swrast` (lavapipe) enumerates
+                    # ZERO `VK_KHR_video*` extensions — so the client advertises codec 0x00
+                    # and every host refuses the session. One ICD per open-source vendor,
+                    # because the venue's GPU is not known at build time. (NVIDIA's
+                    # proprietary stack ships its ICD in `nvidia-utils`, which a venue that
+                    # needs it composes itself.)
+                    - vulkan-radeon
+                    - vulkan-intel
+                    - vulkan-nouveau
+                    # vulkaninfo, so decode capability is ASSERTABLE rather than assumed.
+                    # Nothing checked it before, which is exactly why a client that could
+                    # not decode looked healthy.
+                    - vulkan-tools
                 repo:
                     - name: punktfunk
                       # `$repo` / `$arch` are PACMAN variables, not shell ones: the pac
@@ -92,3 +121,32 @@ punktfunk-client:
                 command: punktfunk --version
               stdout:
                 - matches: "[0-9]+\\.[0-9]+"
+            - check: the renderer binary is installed, not just the control CLI
+              id: punktfunk-client-renderer-binary
+              # `punktfunk` alone cannot stream: it links no video libraries at all. This
+              # asserts the binary `launch` actually spawns is present.
+              file:
+                file: /usr/bin/punktfunk-client
+                exists: true
+            - check: the renderer links a Vulkan loader, so it can reach a decoder
+              id: punktfunk-client-renderer-links-vulkan
+              # Deterministic at image-build time, unlike the capability probe below: it
+              # reads the ELF, not the GPU. Catches a package that dropped its video stack.
+              command:
+                command: ldd /usr/bin/punktfunk-client | grep -q libvulkan
+            - check: at least one hardware Vulkan ICD is installed
+              id: punktfunk-client-hardware-icd
+              # lavapipe (`lvp_icd.json`) does NOT implement video decode, so its presence
+              # alone is the failing state. Assert a non-lavapipe ICD exists.
+              command:
+                command: >-
+                    ls /usr/share/vulkan/icd.d/ | grep -qvx 'lvp_icd.json'
+            - check: the venue's Vulkan stack advertises H.264 decode
+              id: punktfunk-client-vulkan-decodes-h264
+              # THE assertion this candy exists for, and the one whose absence let a client
+              # that could not decode look healthy. Runtime-only: it needs the venue's real
+              # GPU, which an image build does not have.
+              context:
+                - runtime
+              command:
+                command: vulkaninfo 2>/dev/null | grep -q VK_KHR_video_decode_h264
