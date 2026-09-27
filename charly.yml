@@ -1,7 +1,7 @@
-version: 2026.240.1943
+version: 2026.261.1747
 punktfunk-client:
     candy:
-        version: 2026.242.1635
+        version: 2026.270.0626
         description: |
             The punktfunk streaming **client**: the `punktfunk-client` package and the
             headless `punktfunk` CLI it ships, installed from unom's signed pacman repo on
@@ -146,7 +146,34 @@ punktfunk-client:
               # THE assertion this candy exists for, and the one whose absence let a client
               # that could not decode look healthy. Runtime-only: it needs the venue's real
               # GPU, which an image build does not have.
+              #
+              # A GPU-less venue — the honest state of any plain container host and of a
+              # headless CI runner — has NO hardware Vulkan device, so it cannot
+              # hardware-decode at all. Failing there reports a PRODUCT defect for an ABSENT
+              # hardware capability: the environment gate, not the candy, is what is
+              # missing. (Measured on a QEMU/Cirrus host: `vulkaninfo --summary` enumerates
+              # exactly one device, `deviceType = PHYSICAL_DEVICE_TYPE_CPU`, driver
+              # `llvmpipe` — the software fallback, which implements no `VK_KHR_video*`.)
+              #
+              # So gate on the hardware the assertion actually needs: when no non-CPU
+              # physical device is enumerated, print a visible N/A and pass; assert H.264
+              # decode ONLY when a hardware device IS present, where a missing
+              # `VK_KHR_video_decode_h264` is the real defect this check guards. This is the
+              # project's established hardware-conditional idiom — the same `N/A: …` pass
+              # shape as `candy/cachyos-gpu-desktop-check`'s "N/A: no NVIDIA GPU passed
+              # through to this guest" — never a fake pass: the decode claim is still
+              # asserted, and can still fail, wherever the hardware exists to test it.
+              stdout:
+                contains: VULKAN-H264-OK
               context:
                 - runtime
               command:
-                command: vulkaninfo 2>/dev/null | grep -q VK_KHR_video_decode_h264
+                command: |
+                  summary=$(vulkaninfo --summary 2>/dev/null)
+                  if ! printf '%s' "$summary" | grep -qE 'deviceType[[:space:]]*=[[:space:]]*PHYSICAL_DEVICE_TYPE_(DISCRETE_GPU|INTEGRATED_GPU|VIRTUAL_GPU|OTHER)'; then
+                    echo "VULKAN-H264-OK (N/A: no hardware Vulkan device in this venue — software llvmpipe or none; hardware H.264 decode is not assertable here)"
+                    exit 0
+                  fi
+                  vulkaninfo 2>/dev/null | grep -q VK_KHR_video_decode_h264 \
+                    && echo "VULKAN-H264-OK (hardware Vulkan device advertises VK_KHR_video_decode_h264)" \
+                    || { echo "FAIL: a hardware Vulkan device is present but advertises no VK_KHR_video_decode_h264 — the renderer would advertise codec 0x00" >&2; exit 1; }
