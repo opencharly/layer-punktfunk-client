@@ -1,5 +1,7 @@
+version: 2026.261.1747
 punktfunk-client:
     candy:
+        version: 2026.270.0626
         description: |
             The punktfunk streaming **client**: the `punktfunk-client` package and the
             headless `punktfunk` CLI it ships, installed from unom's signed pacman repo on
@@ -111,7 +113,8 @@ punktfunk-client:
               # field rather than mere presence.
               command:
                 command: >-
-                    gpg --homedir /etc/pacman.d/gnupg --batch --list-keys --with-colons E0CA04465C99C936E0B0C6510A317015A34DDD69 | grep -q '^pub:f:'
+                    gpg --homedir /etc/pacman.d/gnupg --batch --list-keys --with-colons
+                    E0CA04465C99C936E0B0C6510A317015A34DDD69 | grep -q '^pub:f:'
             - check: the client CLI answers, so the venue can drive a host
               id: punktfunk-client-cli-answers
               command:
@@ -166,11 +169,11 @@ punktfunk-client:
                 - runtime
               command:
                 command: |
-                    summary=$(vulkaninfo --summary 2>/dev/null)
-                    if ! printf '%s' "$summary" | grep -qE 'deviceType[[:space:]]*=[[:space:]]*PHYSICAL_DEVICE_TYPE_(DISCRETE_GPU|INTEGRATED_GPU|VIRTUAL_GPU|OTHER)'; then
-                      echo "VULKAN-H264-OK (N/A: no hardware Vulkan device in this venue — software llvmpipe or none; hardware H.264 decode is not assertable here)"
-                      exit 0
-                    fi
-                    vulkaninfo 2>/dev/null | grep -q VK_KHR_video_decode_h264 \
-                      && echo "VULKAN-H264-OK (hardware Vulkan device advertises VK_KHR_video_decode_h264)" \
-                      || { echo "FAIL: a hardware Vulkan device is present but advertises no VK_KHR_video_decode_h264 — the renderer would advertise codec 0x00" >&2; exit 1; }
+                  summary=$(vulkaninfo --summary 2>/dev/null)
+                  if ! printf '%s' "$summary" | grep -qE 'deviceType[[:space:]]*=[[:space:]]*PHYSICAL_DEVICE_TYPE_(DISCRETE_GPU|INTEGRATED_GPU|VIRTUAL_GPU|OTHER)'; then
+                    echo "VULKAN-H264-OK (N/A: no hardware Vulkan device in this venue — software llvmpipe or none; hardware H.264 decode is not assertable here)"
+                    exit 0
+                  fi
+                  vulkaninfo 2>/dev/null | grep -q VK_KHR_video_decode_h264 \
+                    && echo "VULKAN-H264-OK (hardware Vulkan device advertises VK_KHR_video_decode_h264)" \
+                    || { echo "FAIL: a hardware Vulkan device is present but advertises no VK_KHR_video_decode_h264 — the renderer would advertise codec 0x00" >&2; exit 1; }
