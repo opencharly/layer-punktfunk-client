@@ -1,7 +1,5 @@
-version: 2026.261.1747
 punktfunk-client:
     candy:
-        version: 2026.270.0626
         description: |
             The punktfunk streaming **client**: the `punktfunk-client` package and the
             headless `punktfunk` CLI it ships, installed from unom's signed pacman repo on
