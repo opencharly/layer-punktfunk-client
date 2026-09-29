@@ -53,7 +53,7 @@ punktfunk launch
 
 ## Related
 
-- Owning family skill: `/charly-check:punktfunk` (the `punktfunk:` verb,
+- Family skill: `/charly-check:punktfunk` (the `punktfunk:` verb,
   including the client methods)
 - Host sibling: [`layer-punktfunk`](https://github.com/opencharly/layer-punktfunk)
   — owning skill `/charly-punktfunk:punktfunk-host`
